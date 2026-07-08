@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Survey Mapping Tool (Mobile & Desktop Friendly)</title>
+<!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+<style>
+.blog-map-wrapper {
+    max-width: 800px;
+    margin: 20px auto;
+    position: relative;
+    font-family: Arial, sans-serif;
+    border: 2px solid #ccc;
+    border-radius: 8px;
+    overflow: hidden;
+}
+#map { 
+    height: 500px; 
+    width: 100%; 
+}
+#toolbar { 
+    position: absolute; 
+    z-index: 1000; 
+    left: 10px; 
+    top: 10px; 
+    background: rgba(255, 255, 255, 0.95); 
+    padding: 10px; 
+    border-radius: 6px; 
+    box-shadow: 0 2px 8px rgba(0,0,0,.2);
+    max-width: 280px;
+}
+.tool-section { margin-bottom: 6px; border-bottom: 1px solid #ddd; padding-bottom: 6px; }
+.tool-section:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+input, button, select { padding: 5px; margin: 2px; font-size: 12px; border-radius: 4px; border: 1px solid #ccc; cursor: pointer; }
+button { background: #f5f5f5; transition: 0.2s; }
+button:hover { background: #e5e5e5; }
+.active-btn { background: #4CAF50 !important; color: white; }
+#search { width: 130px; }
+.status-text { font-size: 13px; font-weight: bold; margin-top: 4px; color: #333; }
+
+.custom-number-icon {
+    background: #ff4d4d;
+    color: white;
+    border: 2px solid white;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 12px;
+    font-weight: bold;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.4);
+}
+
+.delete-btn {
+    background: #ff4d4d;
+    color: white;
+    border: none;
+    padding: 4px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 11px;
+    margin-top: 5px;
+    display: block;
+}
+.delete-btn:hover { background: #cc0000; }
+
+.map-compass {
+    padding: 6px 10px;
+    background: rgba(255, 255, 255, 0.9);
+    border: 2px solid rgba(0,0,0,0.2);
+    border-radius: 4px;
+    font-weight: bold;
+    font-size: 14px;
+    color: #333;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    box-shadow: 0 1px 5px rgba(0,0,0,0.4);
+}
+.compass-arrow {
+    font-size: 20px;
+    color: #ff4d4d;
+    margin-bottom: 2px;
+}
+</style>
+</head>
+<body>
+
+<div class="blog-map-wrapper">
+    <div id="toolbar">
+        <!-- সার্চ ও স্মার্ট জিপিএস -->
+        <div class="tool-section">
+            <input id="search" placeholder="Search place">
+            <button id="searchBtn">Search</button>
+            <button id="gpsBtn" style="background: #2196F3; color: white; font-weight: bold;">📍 Add Current Location (GPS)</button>
+        </div>
+        
+        <!-- এলিমেন্ট যোগ করার টুলস -->
+        <div class="tool-section">
+            <button id="addHouseBtn">🏠 Add Manual Location</button>
+            <div style="margin-top: 4px;">
+                <select id="riverType">
+                    <option value="big">🌊 Big River (বড় নদী)</option>
+                    <option value="small">💧 Small River/Canal (ছোট নদী/খাল)</option>
+                </select>
+                <button id="addRiverBtn">✍️ Draw River</button>
+            </div>
+        </div>
+
+        <!-- স্ট্যাটিস্টিক্স এবং এরিয়া লক ডাউনলোড -->
+        <div class="tool-section">
+            <div class="status-text">Total Locations: <span id="houseCount">0</span></div>
+            <button id="downloadBtn" style="background: #4CAF50; color: white; width: 100%; margin-top: 4px;">📥 Download Surveyed Area</button>
+        </div>
+    </div>
+
+    <div id="map"></div>
+</div>
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+<script>
+const map = L.map('map').setView([23.94, 91.99], 9);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+
+// কম্পাস
+const CompassControl = L.Control.extend({
+    options: { position: 'bottomright' },
+    onAdd: function() {
+        const div = L.DomUtil.create('div', 'map-compass');
+        div.innerHTML = '<div class="compass-arrow">▲</div><div>N</div>';
+        return div;
+    }
+});
+map.addControl(new CompassControl());
+
+let currentMode = null; 
+let houseCount = 0;
+let isDrawingRiver = false;
+let tempRiverPoints = [];
+let tempRiverLine = null;
+
+let savedHouses = [];
+let savedRivers = [];
+
+const surveyFeatureGroup = L.featureGroup().addTo(map);
+
+const addHouseBtn = document.getElementById('addHouseBtn');
+const addRiverBtn = document.getElementById('addRiverBtn');
+const riverTypeSelect = document.getElementById('riverType');
+
+function setMode(mode) {
+    currentMode = mode;
+    addHouseBtn.classList.remove('active-btn');
+    addRiverBtn.classList.remove('active-btn');
+    
+    if (mode === 'river') {
+        addRiverBtn.classList.add('active-btn');
+        map.dragging.disable(); // নদী আঁকার সময় ম্যাপের ড্র্যাগিং পুরোপুরি বন্ধ
+        map.touchZoom.disable(); // মোবাইল জুম বন্ধ
+    } else {
+        map.dragging.enable();
+        map.touchZoom.enable();
+    }
+    
+    if (mode === 'house') addHouseBtn.classList.add('active-btn');
+}
+
+addHouseBtn.onclick = () => {
+    if(currentMode === 'house') setMode(null);
+    else setMode('house');
+};
+
+addRiverBtn.onclick = () => {
+    if(currentMode === 'river') setMode(null);
+    else setMode('river');
+};
+
+map.on('click', e => {
+    if (currentMode === 'house') {
+        askAndAddLocation(e.latlng.lat, e.latlng.lng);
+        setMode(null);
+    } 
+});
+
+function askAndAddLocation(lat, lng) {
+    const locationName = prompt("এই লোকেশনের জন্য একটি নাম বা বিবরণ লিখুন:", "Location");
+    
+    if (locationName !== null && locationName.trim() !== "") {
+        houseCount++;
+        const houseId = houseCount;
+        savedHouses.push({lat: lat, lng: lng, id: houseId, name: locationName});
+        createHouseMarker(lat, lng, houseId, locationName);
+    }
+}
+
+document.getElementById('gpsBtn').onclick = () => {
+    navigator.geolocation.getCurrentPosition(p => {
+        const currentLat = p.coords.latitude;
+        const currentLng = p.coords.longitude;
+        map.setView([currentLat, currentLng], 19);
+        setTimeout(() => { askAndAddLocation(currentLat, currentLng); }, 600); 
+    }, () => { 
+        alert("GPS লোকেশন অ্যাক্সেস করা যায়নি।"); 
+    });
+};
+
+// --- মোবাইল ও ডেক্সটপ উভয়ের জন্য নদী ড্রয়িং হ্যান্ডলার ---
+
+function startDrawing(latlng) {
+    if (currentMode === 'river') {
+        isDrawingRiver = true;
+        tempRiverPoints = [latlng];
+        
+        const type = riverTypeSelect.value;
+        const color = type === 'big' ? '#0055ff' : '#00bfff';
+        const weight = type === 'big' ? 8 : 3;
+
+        tempRiverLine = L.polyline(tempRiverPoints, { color: color, weight: weight, opacity: 0.8 }).addTo(map);
+    }
+}
+
+function moveDrawing(latlng) {
+    if (isDrawingRiver && currentMode === 'river') {
+        tempRiverPoints.push(latlng);
+        tempRiverLine.setLatLngs(tempRiverPoints);
+    }
+}
+
+function stopDrawing() {
+    if (isDrawingRiver && currentMode === 'river') {
+        isDrawingRiver = false;
+        
+        const type = riverTypeSelect.value;
+        const label = type === 'big' ? "Big River" : "Small River/Canal";
+        tempRiverLine.bindPopup(label);
+        
+        surveyFeatureGroup.addLayer(tempRiverLine);
+        
+        savedRivers.push({
+            points: tempRiverPoints.map(p => [p.lat, p.lng]),
+            type: type
+        });
+        
+        tempRiverLine = null;
+        tempRiverPoints = [];
+        setMode(null); // ড্রয়িং শেষে লক রিলিজ
+    }
+}
+
+// মাউস ইভেন্ট (কম্পিউটারের জন্য)
+map.on('mousedown', e => startDrawing(e.latlng));
+map.on('mousemove', e => moveDrawing(e.latlng));
+map.on('mouseup', () => stopDrawing());
+
+// টাচ ইভেন্ট (মোবাইল/ট্যাবলেটের জন্য)
+map.on('touchstart', e => {
+    if (currentMode === 'river') {
+        startDrawing(e.latlng);
+    }
+});
+map.on('touchmove', e => {
+    if (isDrawingRiver && currentMode === 'river') {
+        // মোবাইলের টাচ পজিশন ট্র্যাক করা
+        moveDrawing(e.latlng);
+    }
+});
+map.on('touchend', () => stopDrawing());
+
+
+function createHouseMarker(lat, lng, id, name) {
+    const numberIcon = L.divIcon({
+        className: 'custom-number-icon',
+        html: id, 
+        iconSize: [24, 24],
+        iconAnchor: [12, 12]
+    });
+
+    const marker = L.marker([lat, lng], { icon: numberIcon, draggable: false }).addTo(map);
+    surveyFeatureGroup.addLayer(marker);
+    
+    const popupContent = document.createElement('div');
+    popupContent.innerHTML = `<b>নম্বর: ${id}</b><br><b>নাম: ${name}</b>`;
+    
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'delete-btn';
+    deleteBtn.innerText = '🗑️ Delete Location';
+    
+    deleteBtn.onclick = function() {
+        map.removeLayer(marker);
+        surveyFeatureGroup.removeLayer(marker);
+        savedHouses = savedHouses.filter(h => h.id !== id);
+        updateHouseCount();
+    };
+    
+    popupContent.appendChild(deleteBtn);
+    marker.bindPopup(popupContent);
+
+    updateHouseCount();
+}
+
+function updateHouseCount() {
+    document.getElementById('houseCount').textContent = savedHouses.length;
+}
+
+// সার্চ
+document.getElementById('searchBtn').onclick = () => {
+    const q = document.getElementById('search').value;
+    if(!q) return;
+    fetch("https://nominatim.openstreetmap.org/search?format=json&q=" + encodeURIComponent(q))
+    .then(r => r.json()).then(d => {
+        if (!d.length) return;
+        map.setView([d[0].lat, d[0].lon], 16);
+    });
+};
+
+// ডাউনলোড ফাইল
+document.getElementById('downloadBtn').onclick = () => {
+    if (savedHouses.length === 0 && savedRivers.length === 0) {
+        alert("ম্যাপে কোনো লোকেশন বা নদী যোগ করা হয়নি!");
+        return;
+    }
+
+    const bounds = surveyFeatureGroup.getBounds();
+    const padBounds = bounds.pad(0.2);
+
+    const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Saved Survey Map</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+    <style>
+        html, body, #map { height: 100%; margin: 0; }
+        .custom-number-icon { background: #ff4d4d; color: white; border: 2px solid white; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 12px; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.4); }
+        .delete-btn { background: #ff4d4d; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; margin-top: 5px; display: block; }
+        .map-compass { padding: 6px 10px; background: rgba(255, 255, 255, 0.9); border: 2px solid rgba(0,0,0,0.2); border-radius: 4px; font-weight: bold; font-size: 14px; color: #333; display: flex; flex-direction: column; align-items: center; box-shadow: 0 1px 5px rgba(0,0,0,0.4); }
+        .compass-arrow { font-size: 20px; color: #ff4d4d; margin-bottom: 2px; }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"><\/script>
+    <script>
+        const map = L.map('map');
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+
+        const CompassControl = L.Control.extend({
+            options: { position: 'bottomright' },
+            onAdd: function() {
+                const div = L.DomUtil.create('div', 'map-compass');
+                div.innerHTML = '<div class="compass-arrow">▲</div><div>N</div>';
+                return div;
+            }
+        });
+        map.addControl(new CompassControl());
+
+        const houses = ${JSON.stringify(savedHouses)};
+        const fGroup = L.featureGroup().addTo(map);
+
+        houses.forEach(h => {
+            const numberIcon = L.divIcon({ className: 'custom-number-icon', html: h.id, iconSize: [24, 24], iconAnchor: [12, 12] });
+            const marker = L.marker([h.lat, h.lng], {icon: numberIcon, draggable: false}).addTo(fGroup);
+            
+            const div = document.createElement('div');
+            div.innerHTML = "<b>নম্বর: " + h.id + "</b><br><b>নাম: " + h.name + "</b>";
+            const btn = document.createElement('button');
+            btn.className = 'delete-btn';
+            btn.innerText = '🗑️ Delete';
+            btn.onclick = () => map.removeLayer(marker);
+            div.appendChild(btn);
+            marker.bindPopup(div);
+        });
+
+        const rivers = ${JSON.stringify(savedRivers)};
+        rivers.forEach(r => {
+            const color = r.type === 'big' ? '#0055ff' : '#00bfff';
+            const weight = r.type === 'big' ? 8 : 3;
+            const label = r.type === 'big' ? "Big River" : "Small River/Canal";
+            L.polyline(r.points, { color: color, weight: weight }).addTo(fGroup).bindPopup(label);
+        });
+
+        map.fitBounds([
+            [${padBounds.getSouthWest().lat}, ${padBounds.getSouthWest().lng}],
+            [${padBounds.getNorthEast().lat}, ${padBounds.getNorthEast().lng}]
+        ]);
+    <\/script>
+</body>
+</html>`;
+
+    const blob = new Blob([htmlContent], { type: 'text/html' });
+    const link = document.createElement('a');
+    link.download = 'survey-map-interactive.html';
+    link.href = URL.createObjectURL(blob);
+    link.click();
+};
+</script>
+</body>
+</html>
