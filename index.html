@@ -2,43 +2,68 @@
 <html lang="bn">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Survey Mapping Tool (Mobile & Desktop Friendly)</title>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>Survey Mapping Tool (Large Mobile & Desktop Style)</title>
 <!-- Leaflet CSS -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 <style>
+* { box-sizing: border-box; }
+body { margin: 0; padding: 0; font-family: Arial, sans-serif; background: #f4f4f4; }
+
 .blog-map-wrapper {
-    max-width: 800px;
-    margin: 20px auto;
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
     position: relative;
-    font-family: Arial, sans-serif;
-    border: 2px solid #ccc;
-    border-radius: 8px;
-    overflow: hidden;
 }
+
 #map { 
-    height: 500px; 
+    flex: 1;
     width: 100%; 
+    height: 100%;
 }
+
 #toolbar { 
     position: absolute; 
     z-index: 1000; 
-    left: 10px; 
-    top: 10px; 
-    background: rgba(255, 255, 255, 0.95); 
-    padding: 10px; 
-    border-radius: 6px; 
-    box-shadow: 0 2px 8px rgba(0,0,0,.2);
-    max-width: 280px;
+    left: 20px; 
+    top: 20px; 
+    background: rgba(255, 255, 255, 0.98); 
+    padding: 15px; 
+    border-radius: 10px; 
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    width: 320px; /* ল্যাপটপে টুলবার একটু বড় করা হলো */
 }
-.tool-section { margin-bottom: 6px; border-bottom: 1px solid #ddd; padding-bottom: 6px; }
+
+.tool-section { 
+    margin-bottom: 12px; 
+    border-bottom: 1px solid #eee; 
+    padding-bottom: 12px; 
+}
 .tool-section:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
-input, button, select { padding: 5px; margin: 2px; font-size: 12px; border-radius: 4px; border: 1px solid #ccc; cursor: pointer; }
-button { background: #f5f5f5; transition: 0.2s; }
-button:hover { background: #e5e5e5; }
-.active-btn { background: #4CAF50 !important; color: white; }
-#search { width: 130px; }
-.status-text { font-size: 13px; font-weight: bold; margin-top: 4px; color: #333; }
+
+/* বাটন ও ইনপুট সাইজ বড় করা হলো */
+input, button, select { 
+    padding: 10px; 
+    margin: 4px 2px; 
+    font-size: 14px; 
+    border-radius: 6px; 
+    border: 1px solid #ccc; 
+    cursor: pointer;
+    vertical-align: middle;
+}
+button { background: #f8f9fa; font-weight: 500; transition: 0.2s; }
+button:hover { background: #e2e6ea; }
+.active-btn { background: #4CAF50 !important; color: white; border-color: #4CAF50; }
+#search { width: 60%; }
+#searchBtn { width: 35%; }
+#gpsBtn { width: 100%; background: #2196F3; color: white; font-weight: bold; border-color: #2196F3; }
+#addHouseBtn { width: 100%; }
+#riverType { width: 100%; margin-bottom: 6px; }
+#addRiverBtn { width: 100%; }
+
+.status-text { font-size: 15px; font-weight: bold; margin-top: 6px; color: #333; }
 
 .custom-number-icon {
     background: #ff4d4d;
@@ -48,53 +73,69 @@ button:hover { background: #e5e5e5; }
     display: flex;
     justify-content: center;
     align-items: center;
-    font-size: 12px;
+    font-size: 13px;
     font-weight: bold;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.4);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.4);
 }
 
 .delete-btn {
     background: #ff4d4d;
     color: white;
     border: none;
-    padding: 4px 8px;
+    padding: 6px 10px;
     border-radius: 4px;
     cursor: pointer;
-    font-size: 11px;
-    margin-top: 5px;
+    font-size: 12px;
+    margin-top: 8px;
     display: block;
+    width: 100%;
 }
 .delete-btn:hover { background: #cc0000; }
 
 .map-compass {
-    padding: 6px 10px;
-    background: rgba(255, 255, 255, 0.9);
-    border: 2px solid rgba(0,0,0,0.2);
-    border-radius: 4px;
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.95);
+    border: 2px solid rgba(0,0,0,0.15);
+    border-radius: 6px;
     font-weight: bold;
-    font-size: 14px;
+    font-size: 16px;
     color: #333;
     display: flex;
     flex-direction: column;
     align-items: center;
-    box-shadow: 0 1px 5px rgba(0,0,0,0.4);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
 }
-.compass-arrow {
-    font-size: 20px;
-    color: #ff4d4d;
-    margin-bottom: 2px;
+.compass-arrow { font-size: 24px; color: #ff4d4d; margin-bottom: 2px; }
+
+/* 📱 মোবাইল রেসপনসিভ স্টাইল (মোবাইলে টুলবার নিচে চলে যাবে ম্যাপ বড় দেখানোর জন্য) */
+@media (max-width: 767px) {
+    .blog-map-wrapper { height: 100vh; }
+    #map { height: 65vh; flex: none; } /* মোবাইলে স্ক্রিনের ৬৫% ম্যাপ থাকবে */
+    
+    #toolbar { 
+        position: static; 
+        width: 100%; 
+        height: 35vh; /* বাকি ৩৫% জায়গায় স্ক্রোলযোগ্য টুলবার */
+        overflow-y: auto;
+        border-radius: 0;
+        box-shadow: 0 -3px 10px rgba(0,0,0,0.15);
+        padding: 12px;
+    }
+    input, button, select { font-size: 15px; padding: 11px; } /* মোবাইলের জন্য আরও বড় টাচ টার্গেট */
 }
 </style>
 </head>
 <body>
 
 <div class="blog-map-wrapper">
+    <div id="map"></div>
+
     <div id="toolbar">
         <!-- সার্চ ও স্মার্ট জিপিএস -->
         <div class="tool-section">
             <input id="search" placeholder="Search place">
             <button id="searchBtn">Search</button>
-            <button id="gpsBtn" style="background: #2196F3; color: white; font-weight: bold;">📍 Add Current Location (GPS)</button>
+            <button id="gpsBtn">📍 Add Current Location (GPS)</button>
         </div>
         
         <!-- এলিমেন্ট যোগ করার টুলস -->
@@ -109,14 +150,12 @@ button:hover { background: #e5e5e5; }
             </div>
         </div>
 
-        <!-- স্ট্যাটিস্টিক্স এবং এরিয়া লক ডাউনলোড -->
+        <!-- স্ট্যাটিস্টিক্স এবং ডাউনলোড -->
         <div class="tool-section">
             <div class="status-text">Total Locations: <span id="houseCount">0</span></div>
-            <button id="downloadBtn" style="background: #4CAF50; color: white; width: 100%; margin-top: 4px;">📥 Download Surveyed Area</button>
+            <button id="downloadBtn" style="background: #4CAF50; color: white; width: 100%; margin-top: 6px; font-weight: bold; border-color: #4CAF50;">📥 Download Surveyed Area</button>
         </div>
     </div>
-
-    <div id="map"></div>
 </div>
 
 <!-- Leaflet JS -->
@@ -159,8 +198,8 @@ function setMode(mode) {
     
     if (mode === 'river') {
         addRiverBtn.classList.add('active-btn');
-        map.dragging.disable(); // নদী আঁকার সময় ম্যাপের ড্র্যাগিং পুরোপুরি বন্ধ
-        map.touchZoom.disable(); // মোবাইল জুম বন্ধ
+        map.dragging.disable(); 
+        map.touchZoom.disable(); 
     } else {
         map.dragging.enable();
         map.touchZoom.enable();
@@ -188,7 +227,6 @@ map.on('click', e => {
 
 function askAndAddLocation(lat, lng) {
     const locationName = prompt("এই লোকেশনের জন্য একটি নাম বা বিবরণ লিখুন:", "Location");
-    
     if (locationName !== null && locationName.trim() !== "") {
         houseCount++;
         const houseId = houseCount;
@@ -208,8 +246,6 @@ document.getElementById('gpsBtn').onclick = () => {
     });
 };
 
-// --- মোবাইল ও ডেক্সটপ উভয়ের জন্য নদী ড্রয়িং হ্যান্ডলার ---
-
 function startDrawing(latlng) {
     if (currentMode === 'river') {
         isDrawingRiver = true;
@@ -217,7 +253,7 @@ function startDrawing(latlng) {
         
         const type = riverTypeSelect.value;
         const color = type === 'big' ? '#0055ff' : '#00bfff';
-        const weight = type === 'big' ? 8 : 3;
+        const weight = type === 'big' ? 10 : 4; // লাইনের থিকনেস আরেকটু বাড়ানো হলো
 
         tempRiverLine = L.polyline(tempRiverPoints, { color: color, weight: weight, opacity: 0.8 }).addTo(map);
     }
@@ -247,42 +283,32 @@ function stopDrawing() {
         
         tempRiverLine = null;
         tempRiverPoints = [];
-        setMode(null); // ড্রয়িং শেষে লক রিলিজ
+        setMode(null);
     }
 }
 
-// মাউস ইভেন্ট (কম্পিউটারের জন্য)
+// মাউস এবং টাচ ইভেন্ট
 map.on('mousedown', e => startDrawing(e.latlng));
 map.on('mousemove', e => moveDrawing(e.latlng));
 map.on('mouseup', () => stopDrawing());
 
-// টাচ ইভেন্ট (মোবাইল/ট্যাবলেটের জন্য)
-map.on('touchstart', e => {
-    if (currentMode === 'river') {
-        startDrawing(e.latlng);
-    }
-});
-map.on('touchmove', e => {
-    if (isDrawingRiver && currentMode === 'river') {
-        // মোবাইলের টাচ পজিশন ট্র্যাক করা
-        moveDrawing(e.latlng);
-    }
-});
+map.on('touchstart', e => { if (currentMode === 'river') startDrawing(e.latlng); });
+map.on('touchmove', e => { if (isDrawingRiver && currentMode === 'river') moveDrawing(e.latlng); });
 map.on('touchend', () => stopDrawing());
-
 
 function createHouseMarker(lat, lng, id, name) {
     const numberIcon = L.divIcon({
         className: 'custom-number-icon',
         html: id, 
-        iconSize: [24, 24],
-        iconAnchor: [12, 12]
+        iconSize: [28, 28], // মার্কারের সাইজ বাড়ানো হলো
+        iconAnchor: [14, 14]
     });
 
     const marker = L.marker([lat, lng], { icon: numberIcon, draggable: false }).addTo(map);
     surveyFeatureGroup.addLayer(marker);
     
     const popupContent = document.createElement('div');
+    popupContent.style.fontSize = "14px";
     popupContent.innerHTML = `<b>নম্বর: ${id}</b><br><b>নাম: ${name}</b>`;
     
     const deleteBtn = document.createElement('button');
@@ -298,7 +324,6 @@ function createHouseMarker(lat, lng, id, name) {
     
     popupContent.appendChild(deleteBtn);
     marker.bindPopup(popupContent);
-
     updateHouseCount();
 }
 
@@ -335,10 +360,10 @@ document.getElementById('downloadBtn').onclick = () => {
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
     <style>
         html, body, #map { height: 100%; margin: 0; }
-        .custom-number-icon { background: #ff4d4d; color: white; border: 2px solid white; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 12px; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.4); }
-        .delete-btn { background: #ff4d4d; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; margin-top: 5px; display: block; }
-        .map-compass { padding: 6px 10px; background: rgba(255, 255, 255, 0.9); border: 2px solid rgba(0,0,0,0.2); border-radius: 4px; font-weight: bold; font-size: 14px; color: #333; display: flex; flex-direction: column; align-items: center; box-shadow: 0 1px 5px rgba(0,0,0,0.4); }
-        .compass-arrow { font-size: 20px; color: #ff4d4d; margin-bottom: 2px; }
+        .custom-number-icon { background: #ff4d4d; color: white; border: 2px solid white; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 13px; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.4); }
+        .delete-btn { background: #ff4d4d; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; margin-top: 6px; display: block; width:100%; }
+        .map-compass { padding: 8px 12px; background: rgba(255, 255, 255, 0.95); border: 2px solid rgba(0,0,0,0.15); border-radius: 6px; font-weight: bold; font-size: 16px; color: #333; display: flex; flex-direction: column; align-items: center; box-shadow: 0 2px 6px rgba(0,0,0,0.3); }
+        .compass-arrow { font-size: 24px; color: #ff4d4d; margin-bottom: 2px; }
     </style>
 </head>
 <body>
@@ -362,7 +387,7 @@ document.getElementById('downloadBtn').onclick = () => {
         const fGroup = L.featureGroup().addTo(map);
 
         houses.forEach(h => {
-            const numberIcon = L.divIcon({ className: 'custom-number-icon', html: h.id, iconSize: [24, 24], iconAnchor: [12, 12] });
+            const numberIcon = L.divIcon({ className: 'custom-number-icon', html: h.id, iconSize: [28, 28], iconAnchor: [14, 14] });
             const marker = L.marker([h.lat, h.lng], {icon: numberIcon, draggable: false}).addTo(fGroup);
             
             const div = document.createElement('div');
@@ -378,7 +403,7 @@ document.getElementById('downloadBtn').onclick = () => {
         const rivers = ${JSON.stringify(savedRivers)};
         rivers.forEach(r => {
             const color = r.type === 'big' ? '#0055ff' : '#00bfff';
-            const weight = r.type === 'big' ? 8 : 3;
+            const weight = r.type === 'big' ? 10 : 4;
             const label = r.type === 'big' ? "Big River" : "Small River/Canal";
             L.polyline(r.points, { color: color, weight: weight }).addTo(fGroup).bindPopup(label);
         });
